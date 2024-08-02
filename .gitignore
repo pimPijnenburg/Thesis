@@ -4,6 +4,5 @@ USTC_SmokeRS/Cloud/cloud_100.tif
 .DS_Store
 *.code-workspace
 /data
-
-USTC_SmokeRS Dataset/code/image_df.parquet
 /articles
+*.parquet
