@@ -6,3 +6,4 @@ USTC_SmokeRS/Cloud/cloud_100.tif
 /data
 /articles
 *.parquet
+/USTC_SmokeRS Dataset/data/created_data/for_training
