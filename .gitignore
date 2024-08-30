@@ -1,3 +1,5 @@
-*
-!.gitignore
-!.USTC_SmokeRS_dataset/code
+coursera/
+school/ 
+USTC_SmokeRS_dataset/data/
+/thesis.code-workspace
+*.DS_Store
