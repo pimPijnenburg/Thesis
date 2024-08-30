@@ -1,14 +1,3 @@
-
-USTC_SmokeRS/Cloud/cloud_100.tif
-*.tif
-.DS_Store
-*.code-workspace
-/data
-/articles
-*.parquet
-/USTC_SmokeRS Dataset/data/created_data/for_training
-/coursera
-*.pdf
-*.snapshot
-*.webloc
-/Users/pimpijnenburg/Desktop/Thesis/USTC_SmokeRS_dataset/data
+*
+!*.ipynb
+!.gitignore
