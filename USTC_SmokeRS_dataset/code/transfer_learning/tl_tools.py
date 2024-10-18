@@ -1,73 +1,162 @@
 import os
-import numpy as np 
+import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers, models, mixed_precision
-import pandas as pd
+from tensorflow.keras import layers, models, mixed_precision, Model, regularizers
+from PIL import Image
 
 
 def setup_mixed_precision():
     policy = mixed_precision.Policy('mixed_float16')
     mixed_precision.set_global_policy(policy)
     print("Mixed precision policy set to:", policy.name)
+    print()
 
-def create_optimizer(learning_rate=1e-3):
-    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-    return mixed_precision.LossScaleOptimizer(optimizer) 
-    
 
-AUTOTUNE = tf.data.AUTOTUNE
 
-def optimize_dataset(dataset, batch_size, is_training=False):
-    dataset = dataset.batch(batch_size)
+def normalize(image, label): 
+    return tf.cast(image, tf.float32) / 255., label
+
+
+
+def augment_image(image, label):
+    # Random flip 
+    image = tf.image.random_flip_left_right(image)
     
-    if is_training:
-        dataset = dataset.shuffle(buffer_size=1000)
+    # Random rotation 
+    image = tf.image.rot90(image, k=tf.random.uniform(shape=[], minval=0, maxval=4, dtype=tf.int32))
     
-    dataset = dataset.prefetch(buffer_size=AUTOTUNE)
+    # Random brightness adjustment
+    image = tf.image.random_brightness(image, max_delta=0.2)
+    
+    # Random contrast adjustment
+    image = tf.image.random_contrast(image, lower=0.8, upper=1.2)
+    
+    # Ensure pixel values are still in [0, 1] range
+    image = tf.clip_by_value(image, 0, 1)
+    
+    return image, label
+
+
+
+def process_dataset(dataset, augment = False): 
+    dataset = dataset.map(normalize, num_parallel_calls = tf.data.AUTOTUNE)
+    
+    if augment: 
+        dataset = dataset.map(augment_image, num_parallel_calls = tf.data.AUTOTUNE)
+    
+    #Further data performance optimization
+    dataset = dataset.cache()
+    dataset = dataset.prefetch(buffer_size = tf.data.AUTOTUNE)
     
     return dataset
 
 
+def train_val_split(df,val_split = 0.2):
+
+    """
+    Splits the trainingset into a training and validation split
+
+    Parameters:
+    - df: Training data to split
+    - val_splt: Size of the validation 
+    """
+
+    #Resetting the generator for reproducible results
+    df.reset()
+
+    n_batches = df.num_batches
+    batch_size = df.batch_size
+    n_samples = df.samples
+
+    print(f'Number of batches in the training data: {n_batches}')
+    print(f'Batch size of a single batch {batch_size}')
+    print(f'Number of samples in the training dataset {n_samples}')
+    print()
+
+    #Setting the size of the train and validation set according to the required split and testing if all batches are included
+    val_batches = int(n_batches * val_split)
+    train_batches = n_batches - val_batches
+
+    print(f'Number of training data batches with val split of {val_split}: {train_batches}')
+    print(f'Number of validation data batches: {val_batches}')
+    print()
+    assert train_batches + val_batches == n_batches, 'Train and val batches do not add up to total n batches'
+
+    #Iterating through the batches and appending them into lists for train and val
+    x_train, y_train = list(), list()
+    x_val, y_val = list(), list()
+
+    for batch in range(n_batches):
+        x, y = next(df)
+        if batch < train_batches:
+            x_train.append(x)
+            y_train.append(y)
+
+        else:
+            x_val.append(x)
+            y_val.append(y)
+
+    assert len(x_train) + len(x_val) == n_batches, 'Error in dividing batches into train and val sets'
 
 
-def load_and_prepare_data(path, batch_size=32):
-    # Load the dataframes
-    train_df = pd.read_parquet(os.path.join(path, 'train.parquet'))
-    val_df = pd.read_parquet(os.path.join(path, 'val.parquet'))
-    test_df = pd.read_parquet(os.path.join(path, 'test.parquet'))
+    #Converting the lists into arrays suited for Tensorflow
+    x_train = tf.concat(x_train, axis = 0)
+    y_train = tf.concat(y_train, axis = 0)
+    x_val = tf.concat(x_val, axis = 0)
+    y_val = tf.concat(y_val, axis = 0)
 
-    def preprocess_image(red, green, blue, label):
-        image = tf.stack([red, green, blue], axis=-1)
-        image = tf.reshape(image, (256, 256, 3))
-        image = tf.cast(image, tf.float32) / 255.0
-        label = tf.one_hot(label, depth=6)
-        return image, label
+    print(f'Shape of image training set: {x_train.shape}')
+    print(f'Shape of image validation set: {x_val.shape}')
+    print()
+    print(f'Shape of label training set: {y_train.shape}')
+    print(f'Shape of label validation set: {y_val.shape}')
 
-    def create_dataset(df, shuffle=True):
-        dataset = tf.data.Dataset.from_tensor_slices((
-            df['red_channel'].tolist(),
-            df['green_channel'].tolist(),
-            df['blue_channel'].tolist(),
-            df['class'].tolist()
-        ))
-        
-        dataset = dataset.map(preprocess_image, num_parallel_calls=tf.data.AUTOTUNE)
-        
-        if shuffle:
-            dataset = dataset.shuffle(buffer_size=len(df))
-        
-        dataset = dataset.batch(batch_size)
-        dataset = dataset.prefetch(tf.data.AUTOTUNE)
-        
-        return dataset
-
-    train_dataset = create_dataset(train_df)
-    val_dataset = create_dataset(val_df, shuffle=False)
-    test_dataset = create_dataset(test_df, shuffle=False)
-
-    return train_dataset, val_dataset, test_dataset
+    #Testing to see if all the samples are included
+    assert x_train.shape[0] + x_val.shape[0] == n_samples, 'Error, not all samples included'
 
 
 
+    return x_train, y_train, x_val, y_val
 
 
+
+def test_splits(df):
+
+    """
+    Converts test data to numpy array
+    
+    Parameters:
+    - df: Testdata
+    """
+    
+    #Resetting the generator for reproducible results
+    df.reset()
+
+    n_batches = df.num_batches
+    batch_size = df.batch_size
+    n_samples = df.samples
+
+    print(f'Number of batches in the test data: {n_batches}')
+    print(f'Batch size of a single batch {batch_size}')
+    print(f'Number of samples in the test dataset {n_samples}')
+    print()
+
+    #Iterating through the batches and appending them into lists for train and val
+    x_test, y_test = list(), list()
+
+    for batch in range(n_batches):
+        x, y = next(df)
+        x_test.append(x)
+        y_test.append(y)
+
+    #Converting the lists into arrays suited for Tensorflow
+    x_test = tf.concat(x_test, axis = 0)
+    y_test = tf.concat(y_test, axis = 0)
+
+    print(f'Shape of image test set: {x_test.shape}')
+    print()
+    print(f'Shape of label test set: {y_test.shape}')
+
+    #Testing to see if all the samples are included
+    assert  x_test.shape[0] == n_samples, 'Error, not all samples included'
+    return x_test, y_test
