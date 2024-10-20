@@ -4,3 +4,4 @@ USTC_SmokeRS_dataset/data/
 /thesis.code-workspace
 *.DS_Store
 __pycache__/
+*.keras
