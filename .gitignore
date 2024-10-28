@@ -5,3 +5,4 @@ USTC_SmokeRS_dataset/data/
 *.DS_Store
 __pycache__/
 *.keras
+*.pth

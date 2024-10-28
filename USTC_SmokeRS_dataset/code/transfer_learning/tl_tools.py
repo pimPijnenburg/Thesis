@@ -160,3 +160,45 @@ def test_splits(df):
     #Testing to see if all the samples are included
     assert  x_test.shape[0] == n_samples, 'Error, not all samples included'
     return x_test, y_test
+
+
+
+def fc_layers(model, name='smoke_classifier'):
+    """Adds same FC layer structure of the baseline to the pretrained architecture. 
+    These layers can be trained further upon."""
+    x = model.output
+    
+   #FC1
+    x = layers.Dense(64, activation='relu')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Dropout(0.3)(x)
+
+    #FC2
+    x = layers.Dense(32, activation='relu')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Dropout(0.3)(x)
+
+    #output layer
+    outputs = layers.Dense(6, activation='softmax', dtype='float32')(x)
+    full_model = Model(inputs=model.input, outputs=outputs, name=name)
+    
+    return full_model
+
+
+
+
+
+def plot_feature_importances(series, n_plotted): 
+    series = series.sort_values(ascending = False).head(n_plotted)
+    X = series
+    y = series.index
+    plt.figure(figsize = (15, 10))
+    sns.barplot(x = X, y = y, order = y, orient = 'h', palette = 'viridis', hue = X, legend = False)
+    
+    plt.title(f'Top {n_plotted} Feature Importance Scores', fontsize = 14)
+    plt.xlabel('Importance scores', fontsize = 14)
+    plt.ylabel('Feature index', fontsize = 14)
+    
+    
+    plt.tight_layout()
+    plt.show()
