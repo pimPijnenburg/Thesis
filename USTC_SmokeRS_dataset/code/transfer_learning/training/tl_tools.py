@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers, models, mixed_precision, Model, regularizers
+from tensorflow.keras import layers, models, mixed_precision, Model
 from PIL import Image
 
 
@@ -185,20 +185,3 @@ def fc_layers(model, name='smoke_classifier'):
     return full_model
 
 
-
-
-
-def plot_feature_importances(series, n_plotted): 
-    series = series.sort_values(ascending = False).head(n_plotted)
-    X = series
-    y = series.index
-    plt.figure(figsize = (15, 10))
-    sns.barplot(x = X, y = y, order = y, orient = 'h', palette = 'viridis', hue = X, legend = False)
-    
-    plt.title(f'Top {n_plotted} Feature Importance Scores', fontsize = 14)
-    plt.xlabel('Importance scores', fontsize = 14)
-    plt.ylabel('Feature index', fontsize = 14)
-    
-    
-    plt.tight_layout()
-    plt.show()
