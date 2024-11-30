@@ -6,6 +6,7 @@ from PIL import Image
 
 
 def setup_mixed_precision():
+    #sets a mixed precision for handling memory 
     policy = mixed_precision.Policy('mixed_float16')
     mixed_precision.set_global_policy(policy)
     print("Mixed precision policy set to:", policy.name)
@@ -14,24 +15,25 @@ def setup_mixed_precision():
 
 
 def normalize(image, label): 
+    #normlaizes img
     return tf.cast(image, tf.float32) / 255., label
 
 
 
 def augment_image(image, label):
-    # Random flip 
+    #random flip 
     image = tf.image.random_flip_left_right(image)
     
-    # Random rotation 
+    #ranodm rotation 
     image = tf.image.rot90(image, k=tf.random.uniform(shape=[], minval=0, maxval=4, dtype=tf.int32))
     
-    # Random brightness adjustment
+    #random brightness adjust
     image = tf.image.random_brightness(image, max_delta=0.2)
     
-    # Random contrast adjustment
+    #random contrast adjust
     image = tf.image.random_contrast(image, lower=0.8, upper=1.2)
     
-    # Ensure pixel values are still in [0, 1] range
+    #make sure pixel values are in the [0,1] range
     image = tf.clip_by_value(image, 0, 1)
     
     return image, label
@@ -44,7 +46,7 @@ def process_dataset(dataset, augment = False):
     if augment: 
         dataset = dataset.map(augment_image, num_parallel_calls = tf.data.AUTOTUNE)
     
-    #Further data performance optimization
+    #further data performance optimization
     dataset = dataset.cache()
     dataset = dataset.prefetch(buffer_size = tf.data.AUTOTUNE)
     
@@ -113,9 +115,6 @@ def train_val_split(df,val_split = 0.2):
 
     #Testing to see if all the samples are included
     assert x_train.shape[0] + x_val.shape[0] == n_samples, 'Error, not all samples included'
-
-
-
     return x_train, y_train, x_val, y_val
 
 
